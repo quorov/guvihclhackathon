@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Voice Detection</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #000;
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+        .container { 
+            max-width: 700px;
+            margin: 40px auto;
+            background: #111;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(255, 255, 255, 0.05);
+            border: 1px solid #222;
+        }
+        h1 { 
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            color: #fff;
+        }
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 0.9em;
+        }
+        .form-group { margin-bottom: 25px; }
+        label { 
+            display: block;
+            margin-bottom: 8px;
+            color: #b0b0b0;
+            font-weight: 500;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        input, textarea, select { 
+            width: 100%;
+            padding: 14px;
+            background: #000;
+            border: 1px solid #333;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #fff;
+            transition: all 0.3s;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #fff;
+            background: #0a0a0a;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+        textarea { resize: vertical; font-family: monospace; min-height: 100px; }
+        select { cursor: pointer; }
+        button { 
+            width: 100%;
+            padding: 16px;
+            background: #fff;
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        button:hover { 
+            background: #ddd;
+            transform: translateY(-2px);
+        }
+        button:disabled { 
+            background: #333;
+            color: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result { 
+            margin-top: 30px;
+            padding: 25px;
+            border-radius: 15px;
+            display: none;
+            animation: slideIn 0.3s ease;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .success { 
+            background: #0a2e0a;
+            border: 1px solid #1a4d1a;
+        }
+        .error { 
+            background: #2e0a0a;
+            border: 1px solid #4d1a1a;
+        }
+        .result-label { 
+            font-size: 24px;
+            font-weight: bold;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .ai-generated { 
+            background: #ff4444;
+            color: #fff;
+        }
+        .human { 
+            background: #44ff44;
+            color: #000;
+        }
+        .icon { font-size: 1.2em; margin-right: 8px; }
+        input[type="file"] {
+            padding: 10px;
+            cursor: pointer;
+        }
+        input[type="file"]::file-selector-button {
+            background: #222;
+            border: 1px solid #444;
+            padding: 8px 16px;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background: #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 AI Voice Detection</h1>
+        <p class="subtitle">Multi-Language Voice Analysis System</p>
+        
+        <div class="form-group">
+            <label>Audio Input Type</label>
+            <select id="inputType" onchange="toggleInput()">
+                <option value="file">📁 Upload Audio File</option>
+                <option value="url">🔗 Audio URL</option>
+                <option value="base64">📝 Base64 Encoded</option>
+            </select>
+        </div>
+        
+        <div class="form-group" id="fileInput">
+            <label>Upload Audio File</label>
+            <input type="file" id="audioFile" accept="audio/*">
+        </div>
+        
+        <div class="form-group" id="urlInput" style="display:none;">
+            <label>Audio File URL</label>
+            <input type="text" id="audioUrl" placeholder="https://example.com/audio.mp3">
+        </div>
+        
+        <div class="form-group" id="base64Input" style="display:none;">
+            <label>Base64 Encoded Audio</label>
+            <textarea id="audioBase64" rows="4" placeholder="Paste base64 encoded MP3 here..."></textarea>
+        </div>
+        
+        <button onclick="testEndpoint()">🚀 Analyze Audio</button>
+        
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        function toggleInput() {
+            const type = document.getElementById('inputType').value;
+            document.getElementById('fileInput').style.display = type === 'file' ? 'block' : 'none';
+            document.getElementById('urlInput').style.display = type === 'url' ? 'block' : 'none';
+            document.getElementById('base64Input').style.display = type === 'base64' ? 'block' : 'none';
+        }
+        
+        async function testEndpoint() {
+            const endpoint = '/detect';
+            const apiKey = 'your-secret-api-key-12345';
+            const inputType = document.getElementById('inputType').value;
+            const audioUrl = document.getElementById('audioUrl').value;
+            const audioBase64 = document.getElementById('audioBase64').value;
+            const audioFile = document.getElementById('audioFile').files[0];
+            const resultDiv = document.getElementById('result');
+            const button = document.querySelector('button');
+            
+            let audioInput = null;
+            let payload = {};
+            
+            if (inputType === 'url') {
+                audioInput = audioUrl;
+                payload = { audio_url: audioUrl };
+            } else if (inputType === 'base64') {
+                audioInput = audioBase64;
+                payload = { audio_base64: audioBase64 };
+            } else if (inputType === 'file') {
+                if (!audioFile) {
+                    resultDiv.className = 'result error';
+                    resultDiv.style.display = 'block';
+                    resultDiv.innerHTML = '<span class="icon">❌</span> Please select an audio file';
+                    return;
+                }
+                audioInput = audioFile;
+            }
+            
+            if (!audioInput) {
+                resultDiv.className = 'result error';
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = '<span class="icon">❌</span> Please fill in all required fields';
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = '⏳ Analyzing...';
+            resultDiv.style.display = 'none';
+            
+            try {
+                if (inputType === 'file') {
+                    const reader = new FileReader();
+                    const base64Promise = new Promise((resolve, reject) => {
+                        reader.onload = () => {
+                            const base64 = reader.result.split(',')[1];
+                            resolve(base64);
+                        };
+                        reader.onerror = reject;
+                        reader.readAsDataURL(audioFile);
+                    });
+                    const base64Data = await base64Promise;
+                    payload = { audio_base64: base64Data };
+                }
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': apiKey,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const isAI = data.classification === 'AI-Generated';
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <span class="icon">✅</span> <strong>Analysis Complete</strong>
+                        </div>
+                        <div class="result-label ${isAI ? 'ai-generated' : 'human'}">
+                            ${isAI ? '🤖' : '👤'} ${data.classification}
+                            <div style="font-size: 0.8em; margin-top: 5px;">${data.confidence_score}% Confidence</div>
+                        </div>
+                        <div style="margin-top: 15px; color: #d0d0d0;">
+                            <strong>Analysis:</strong><br>${data.explanation}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.innerHTML = `<span class="icon">❌</span> <strong>Error ${response.status}</strong><br>${data.error || data.message}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `<span class="icon">❌</span> <strong>Request Failed</strong><br>${error.message}`;
+            } finally {
+                button.disabled = false;
+                button.textContent = '🚀 Analyze Audio';
+                resultDiv.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>
