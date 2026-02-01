@@ -70,12 +70,27 @@ def detect_voice():
         if not data:
             return jsonify({"error": "Bad Request", "message": "Request body must be JSON"}), 400
         
-        # Accept multiple field names
-        audio_base64 = data.get('audio_base64') or data.get('audio') or data.get('audioData') or data.get('audio_data')
-        audio_url = data.get('audio_url') or data.get('audioUrl') or data.get('url')
+        # Log received data for debugging
+        print("Received data keys:", list(data.keys()))
+        
+        # Accept any field that might contain audio
+        audio_base64 = None
+        audio_url = None
+        
+        for key in data.keys():
+            value = data[key]
+            if value and isinstance(value, str):
+                if key.lower() in ['audio_base64', 'audio', 'audiodata', 'audio_data', 'base64', 'file']:
+                    audio_base64 = value
+                elif key.lower() in ['audio_url', 'audiourl', 'url', 'link']:
+                    audio_url = value
         
         if not audio_base64 and not audio_url:
-            return jsonify({"error": "Bad Request", "message": "audio_base64 or audio_url is required"}), 400
+            return jsonify({
+                "error": "Bad Request", 
+                "message": "audio_base64 or audio_url is required",
+                "received_keys": list(data.keys())
+            }), 400
         
         # Handle URL
         if audio_url:
