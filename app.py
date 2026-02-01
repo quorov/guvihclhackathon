@@ -74,16 +74,8 @@ def detect_voice():
         print("Received data keys:", list(data.keys()))
         
         # Accept any field that might contain audio
-        audio_base64 = None
-        audio_url = None
-        
-        for key in data.keys():
-            value = data[key]
-            if value and isinstance(value, str):
-                if key.lower() in ['audio_base64', 'audio', 'audiodata', 'audio_data', 'base64', 'file']:
-                    audio_base64 = value
-                elif key.lower() in ['audio_url', 'audiourl', 'url', 'link']:
-                    audio_url = value
+        audio_base64 = data.get('audioBase64') or data.get('audio_base64') or data.get('audio') or data.get('audioData')
+        audio_url = data.get('audio_url') or data.get('audioUrl') or data.get('url')
         
         if not audio_base64 and not audio_url:
             return jsonify({
