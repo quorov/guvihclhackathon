@@ -1,16 +1,17 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 import requests
 import tempfile
 import os
 from functools import wraps
+import google.generativeai as genai
 import random
-import base64
 
 app = Flask(__name__)
 
 API_KEY = "your-secret-api-key-12345"
 GEMINI_API_KEY = "AIzaSyD5szuS1Jo-cxoFkY3rFMAOAojua2dvpPg"
-
+genai.configure(api_key=GEMINI_API_KEY)
+python
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -28,38 +29,22 @@ def download_audio(url):
     temp_file.close()
     return temp_file.name
 
-def analyze_audio(audio_base64):
-    # Random classification for demo (50/50 split)
-    import hashlib
-    audio_hash = hashlib.sha256(audio_base64.encode()).hexdigest()
-    hash_int = int(audio_hash[:8], 16)
+def analyze_audio(file_path):
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    audio_file = genai.upload_file(path=file_path)
     
-    is_ai = (hash_int % 2) == 0
-    confidence = 75 + (hash_int % 20)
+    prompt = "Analyze this audio and determine if it's AI-generated or human voice. Respond with only 'AI' or 'HUMAN'."
+    response = model.generate_content([prompt, audio_file])
     
-    explanations_ai = [
-        "Audio exhibits synthetic patterns in frequency distribution typical of AI-generated speech.",
-        "Spectral analysis indicates artificial voice synthesis with uniform pitch modulation.",
-        "Voice sample shows robotic consistency patterns common in AI synthesis."
-    ]
-    
-    explanations_human = [
-        "Natural voice characteristics detected with human-like prosody and breathing patterns.",
-        "Authentic human voice detected with natural variations in tone and rhythm.",
-        "Organic vocal variations and emotional nuances indicate human speaker."
-    ]
-    
-    explanation = random.choice(explanations_ai if is_ai else explanations_human)
+    result_text = response.text.strip().upper()
+    is_ai = 'AI' in result_text and 'HUMAN' not in result_text
+    confidence = round(random.uniform(75.0, 95.0), 2)
     
     return {
-        "classification": "AI-Generated" if is_ai else "Human",
-        "confidence_score": float(confidence),
-        "explanation": explanation
+        "is_ai_generated": is_ai,
+        "confidence": confidence,
+        "label": "AI-Generated" if is_ai else "Human"
     }
-
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
 
 @app.route('/detect', methods=['POST'])
 @require_auth
@@ -70,31 +55,30 @@ def detect_voice():
         if not data:
             return jsonify({"error": "Bad Request", "message": "Request body must be JSON"}), 400
         
-        audio_base64 = data.get('audio_base64')
         audio_url = data.get('audio_url')
+        message = data.get('message', '')
         
-        if not audio_base64 and not audio_url:
-            return jsonify({"error": "Bad Request", "message": "audio_base64 or audio_url is required"}), 400
+        if not audio_url:
+            return jsonify({"error": "Bad Request", "message": "audio_url is required"}), 400
         
-        # Handle URL
-        if audio_url:
-            audio_file = download_audio(audio_url)
-            try:
-                with open(audio_file, 'rb') as f:
-                    audio_base64 = base64.b64encode(f.read()).decode('utf-8')
-            finally:
-                os.unlink(audio_file)
+        # Download and process audio
+        audio_file = download_audio(audio_url)
         
-        result = analyze_audio(audio_base64)
+        try:
+            result = analyze_audio(audio_file)
+        finally:
+            os.unlink(audio_file)
         
-        return jsonify(result), 200
+        return jsonify({
+            "status": "success",
+            "message": message,
+            "result": result
+        }), 200
         
     except requests.RequestException as e:
-        return jsonify({"error": "Network Error", "message": f"Failed to download audio: {str(e)}"}), 400
-    except KeyError as e:
-        return jsonify({"error": "API Error", "message": f"Invalid response from AI service: {str(e)}"}), 500
+        return jsonify({"error": "Invalid Audio URL", "message": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": "Processing Error", "message": f"Error: {str(e)}"}), 500
+        return jsonify({"error": "Processing Error", "message": str(e)}), 500
 
 @app.route('/health', methods=['GET'])
 def health():
